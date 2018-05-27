@@ -10,6 +10,7 @@
 
 #include <stdio.h>
 #include <sys/time.h>
+#endif
 
 #define IMG_DIMENSION 32
 #define N_IMG_PAIRS 10000
@@ -17,6 +18,15 @@
 typedef unsigned char uchar;
 #define OUT
 
+#if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)
+#define CUDA_CHECK(f) do {                                                                  \
+    cudaError_t e = f;                                                                      \
+    if (e != cudaSuccess) {                                                                 \
+        printf("Cuda failure %s:%d: '%s'\n", __FILE__, __LINE__, cudaGetErrorString(e));    \
+        return 1;                                                                           \
+    }                                                                                       \
+} while (0)
+#else
 #define CUDA_CHECK(f) do {                                                                  \
     cudaError_t e = f;                                                                      \
     if (e != cudaSuccess) {                                                                 \
@@ -24,14 +34,44 @@ typedef unsigned char uchar;
         exit(1);                                                                            \
     }                                                                                       \
 } while (0)
+#endif
 
 #define SQR(a) ((a) * (a))
 
+#if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)
+#if !defined(WIN32_LEAN_AND_MEAN)
+#define WIN32_LEAN_AND_MEAN
+#endif
+double inline get_time_msec (void) {
+    LARGE_INTEGER t;
+    static double oofreq;
+    static int checkedForHighResTimer;
+    static BOOL hasHighResTimer;
+
+    if (!checkedForHighResTimer)
+    {
+        hasHighResTimer = QueryPerformanceFrequency(&t);
+        oofreq = 1000.0 / (double)t.QuadPart;
+        checkedForHighResTimer = 1;
+    }
+
+    if (hasHighResTimer)
+    {
+        QueryPerformanceCounter(&t);
+        return (double)t.QuadPart * oofreq;
+    }
+    else
+    {
+        return (double)GetTickCount();
+    }
+}
+#else
 double static inline get_time_msec(void) {
     struct timeval t;
     gettimeofday(&t, NULL);
     return t.tv_sec * 1e+3 + t.tv_usec * 1e-3;
 }
+#endif
 
 /* we won't load actual files. just fill the images with random bytes */
 void load_image_pairs(uchar *images1, uchar *images2) {
