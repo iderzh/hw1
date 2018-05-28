@@ -164,9 +164,18 @@ int main() {
         double *gpu_hist_distance; //TODO: allocate with cudaMalloc
         double cpu_hist_distance;
 
+        CUDA_CHECK( cudaMalloc(&gpu_image1, IMG_DIMENSION * IMG_DIMENSION) );
+        CUDA_CHECK( cudaMalloc(&gpu_image2, IMG_DIMENSION * IMG_DIMENSION) );
+        CUDA_CHECK( cudaMalloc(&gpu_hist1, 256) );
+        CUDA_CHECK( cudaMalloc(&gpu_hist2, 256) );
+        CUDA_CHECK( cudaMalloc(&gpu_hist_distance, sizeof (double)) );
+
         t_start = get_time_msec();
         for (int i = 0; i < N_IMG_PAIRS; i++) {
             // TODO: copy relevant images from images1 and images2 to gpu_image1 and gpu_image2
+            CUDA_CHECK( cudaMemcpy(gpu_image1, &images1[i * IMG_DIMENSION * IMG_DIMENSION], IMG_DIMENSION * IMG_DIMENSION, cudaMemcpyHostToDevice) );
+            CUDA_CHECK( cudaMemcpy(gpu_image2, &images2[i * IMG_DIMENSION * IMG_DIMENSION], IMG_DIMENSION * IMG_DIMENSION, cudaMemcpyHostToDevice) );
+
             image_to_hisogram_simple<<<1, 1024>>>(gpu_image1, gpu_hist1);
             image_to_hisogram_simple<<<1, 1024>>>(gpu_image2, gpu_hist2);
             histogram_distance<<<1, 256>>>(gpu_hist1, gpu_hist2, gpu_hist_distance);
@@ -177,6 +186,11 @@ int main() {
         t_finish = get_time_msec();
         printf("average distance between images %f\n", total_distance / N_IMG_PAIRS);
         printf("total time %f [msec]\n", t_finish - t_start);
+        CUDA_CHECK( cudaFree(gpu_image1) );
+        CUDA_CHECK( cudaFree(gpu_image2) );
+        CUDA_CHECK( cudaFree(gpu_hist1) );
+        CUDA_CHECK( cudaFree(gpu_hist2) );
+        CUDA_CHECK( cudaFree(gpu_hist_distance) );
     } while (0);
 
     /* using GPU task-serial + images and histograms in shared memory */
@@ -190,6 +204,9 @@ int main() {
     /* Your Code Here */
     printf("average distance between images %f\n", total_distance / N_IMG_PAIRS);
     printf("total time %f [msec]\n", t_finish - t_start);
+
+    CUDA_CHECK( cudaFreeHost(images1) );
+    CUDA_CHECK( cudaFreeHost(images2) );
 
     return 0;
 }
